@@ -138,7 +138,7 @@ private:
     string writeObject(const string &content, const string &type)
     {
         string header = type + " " + to_string(content.length()) + "$";
-        // header.push_back('\0');
+        // header.push_back('$');
         string store = header + content;
         string sha = computeSHA1(store);
 
@@ -163,6 +163,7 @@ private:
     pair<string, string> readObject(const string &sha)
     {
         string objectPath = OBJECTS_DIR + "/" + sha.substr(0, 2) + "/" + sha.substr(2);
+        // cout<<"objectpath="<<objectPath<<endl;
         ifstream file(objectPath, ios::binary);
         //  cout<<"objectPath "<<objectPath<<endl;
         if (!file.is_open())
@@ -175,6 +176,7 @@ private:
         file.close();
 
         string decompressed = decompressData(buffer.str());
+       
         size_t nullPos = decompressed.find('$');
         if (nullPos == string::npos)
         {
@@ -219,106 +221,7 @@ private:
         }
     }
 
-    // // Helper function to create tree object from staged files
-    // string writeTreeFromStagedFiles(const vector<string> &stagedFiles)
-    // {
-    //     stringstream treeContent;
-
-    //     // Sort files to ensure consistent tree hashes
-    //     map<string, pair<string, string>> sortedEntries; // filename -> (mode, sha)
-
-    //     for (const string &line : stagedFiles)
-    //     {
-    //         istringstream iss(line);
-    //         string mode, sha, filename;
-    //         iss >> mode >> sha >> filename;
-    //         sortedEntries[filename] = make_pair(mode, sha);
-    //     }
-
-    //     // Build tree content from sorted entries
-    //     for (const auto &entry : sortedEntries)
-    //     {
-    //         treeContent << entry.second.first << " blob " << entry.second.second
-    //                     << " " << entry.first << "\n";
-    //     }
-
-    //     // Write and return tree object
-    //     return writeObject(treeContent.str(), "tree");
-    // }
-
-    // // Helper function to read HEAD commit
-    // string readHead()
-    // {
-    //     string headPath = GIT_DIR + "/HEAD";
-    //     ifstream headFile(headPath);
-    //     string head;
-
-    //     if (headFile.is_open())
-    //     {
-    //         getline(headFile, head);
-    //         headFile.close();
-    //         return head;
-    //     }
-    //     return "";
-    // }
-
-    // // Helper function to update HEAD
-    // void updateHead(const string &commitSha)
-    // {
-    //     string headPath = GIT_DIR + "/HEAD";
-    //     ofstream headFile(headPath);
-    //     if (headFile.is_open())
-    //     {
-    //         headFile << commitSha;
-    //         headFile.close();
-    //     }
-    //     else
-    //     {
-    //         throw runtime_error("Could not update HEAD");
-    //     }
-    // }
-
-    // // Helper function to get current timestamp as string
-    // string getTimestamp() {
-    //     time_t now = time(nullptr);
-    //     return to_string(now);
-    // }
-
-    // // Helper function to get commit author info
-    // string getAuthorInfo() {
-    //     // You can modify this to get actual user info from config
-    //     return "Saurav <sauravdeshmukh200@gmail.com>";
-    // }
-
-    // // Helper function to create tree object from index
-    // string createTreeFromIndex() {
-    //     vector<string> stagedFiles;
-    //     string indexPath = GIT_DIR + "/index";
-    //     ifstream indexFile(indexPath);
-        
-    //     if (!indexFile.is_open()) {
-    //         throw runtime_error("Index file not found");
-    //     }
-
-    //     string line;
-    //     while (getline(indexFile, line)) {
-    //         if (!line.empty()) {
-    //             stagedFiles.push_back(line);
-    //         }
-    //     }
-    //     indexFile.close();
-
-    //     if (stagedFiles.empty()) {
-    //         throw runtime_error("No files in staging area");
-    //     }
-
-    //     stringstream treeContent;
-    //     for (const string& entry : stagedFiles) {
-    //         treeContent << entry << "\n";
-    //     }
-
-    //     return writeObject(treeContent.str(), "tree");
-    // }
+    
 
 
 
@@ -438,7 +341,7 @@ public:
             switch (flag)
             {
             case 'p':
-                cout << content<<"\n";
+                cout <<content<<"\n";
                 break;
             case 't':
                 cout << type << endl;
@@ -467,7 +370,7 @@ public:
         {
             // cout << "entry is " << entry.path() << endl;
 
-            if (entry.path().filename().string() == GIT_DIR)
+            if (entry.path().filename().string() == GIT_DIR or entry.path().filename().string() == ".git")
                 continue; // Skip the .mygit directory
 
             string name = entry.path().filename().string();
@@ -545,53 +448,7 @@ public:
         }
     }
 
-    // // Function to add files to the index
-    // void addFiles(const vector<string> &files)
-    // {
-    //     set<string> addedFiles; // To track already added files
-
-    //     // Open index file in append mode, and also read the existing contents to prevent duplicates
-    //     ifstream indexRead(GIT_DIR + "/index");
-    //     string line;
-    //     while (getline(indexRead, line))
-    //     {
-    //         istringstream iss(line);
-    //         string mode, sha, filename;
-    //         iss >> mode >> sha >> filename;
-    //         addedFiles.insert(mode+ " " + sha + " " + filename ); // Add already staged files to the set
-    //     }
-    //     indexRead.close();
-
-    //     ofstream indexFile(GIT_DIR + "/index", ios::app); // Append mode for new entries
-
-    //     for (const string &file : files)
-    //     {
-    //         // Skip adding directories or files already in the index
-    //         if (fs::is_directory(file) || addedFiles.find(file) != addedFiles.end())
-    //         {
-    //             continue;
-    //         }
-
-    //         ifstream infile(file);
-    //         if (!infile.is_open())
-    //         {
-    //             cerr << "File " << file << " does not exist or cannot be opened." << endl;
-    //             continue;
-    //         }
-
-    //         string sha = hashObject(file, true); // Hash the file and store as a blob
-    //         string mode = "100644";              // Regular file mode
-
-    //         // Write the file's details (mode, SHA, filename) to the index
-    //         indexFile << mode << " " << sha << " " << file << endl;
-    //         addedFiles.insert(file); // Add to the set to prevent duplicates
-
-    //         cout << "Added " << file << " to the index." << endl;
-    //     }
-
-    //     indexFile.close();
-    // }
-
+    
 
 
 // Function to add files to the index
@@ -639,69 +496,6 @@ void addFiles(const vector<string>& files) {
 
 
 
-//      void commitChanges(const string& message = "") {
-//     try {
-//         // Validate staging area
-//         string indexPath = GIT_DIR + "/index";
-//         if (!fs::exists(indexPath)) {
-//             throw runtime_error("Nothing to commit (create/copy files and use 'mygit add' to track)");
-//         }
-
-//         // Create commit message
-//         string commitMsg = message.empty() ? "Default commit message" : message;
-
-//         // Create tree object from staged files
-//         string treeSha = createTreeFromIndex();
-
-//         // Build commit content
-//         stringstream commitContent;
-//         commitContent << "tree " << treeSha << "\n";
-
-//         // Add parent commit if exists
-//         string parentCommit;
-//         ifstream headFileIn(GIT_DIR + "/HEAD");
-//         if (headFileIn.is_open()) {
-//             getline(headFileIn, parentCommit);
-//             headFileIn.close();
-//             if (!parentCommit.empty()) {
-//                 commitContent << "parent " << parentCommit << "\n";
-//             }
-//         }
-
-//         // Add author and timestamp
-//         string timestamp = getTimestamp();
-//         string author = getAuthorInfo();
-//         commitContent << "author " << author << " " << timestamp << "\n";
-//         commitContent << "committer " << author << " " << timestamp << "\n\n";
-//         commitContent << commitMsg << "\n";
-
-//         // Create commit object
-//         string commitSha = writeObject(commitContent.str(), "commit");
-
-//         // Update HEAD
-//         ofstream headFileOut(GIT_DIR + "/HEAD");
-//         if (!headFileOut.is_open()) {
-//             throw runtime_error("Could not update HEAD");
-//         }
-//         headFileOut << commitSha;
-//         headFileOut.close();
-
-//         // Clear index (staging area)
-//         ofstream indexFile(indexPath, ios::trunc);
-//         indexFile.close();
-
-//         // Output success message
-//         cout << "[main " << commitSha.substr(0, 7) << "] " << commitMsg << "\n";
-        
-//         // Show summary of changes
-//         cout << " " << countStagedFiles() << " files changed\n";
-
-//         cout<<"Commit created: "<<commitSha<<endl;
-
-//     } catch (const exception& e) {
-//         cerr << "Error: " << e.what() << endl;
-//     }
-// }
 
 
 // adding updated commit
@@ -919,19 +713,7 @@ void commitChanges(const string& message = "") {
         return count;
     }
 
-//added updated commit above
 
-
-    // // Helper function to count staged files
-    // int countStagedFiles() {
-    //     ifstream indexFile(GIT_DIR + "/index");
-    //     int count = 0;
-    //     string line;
-    //     while (getline(indexFile, line)) {
-    //         if (!line.empty()) count++;
-    //     }
-    //     return count;
-    // }
 
     void logCommits()
     {

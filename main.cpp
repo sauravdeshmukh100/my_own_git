@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <bits/stdc++.h>
 #include "my_git.cpp"
 
 void printUsage()
@@ -16,7 +17,6 @@ void printUsage()
          << "   commit -m \"<msg>\"       Commit changes to the repository\n"
          << "   log                     Show commit logs\n";
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -125,18 +125,27 @@ int main(int argc, char *argv[])
         {
             vector<string> files;
 
-            // Add all files in the current directory except for .mygit
-            for (const auto &entry : fs::directory_iterator("."))
+            // Recursively traverse the current directory
+            for (const auto &entry : fs::recursive_directory_iterator("."))
             {
-                if (entry.path().filename() != ".mygit" && entry.is_regular_file())
+                // Skip files or directories inside the .mygit directory
+                if (entry.path().string().find(".mygit") != string::npos or entry.path().string().find(".git") != string::npos)
+                    continue;
+
+                // Add regular files to the files vector
+                if (entry.is_regular_file())
                 {
-                    files.push_back(entry.path().filename().string());
+                    string temp=entry.path().string();
+                    temp=temp.substr(2);
+                    // cout<<"file="<<temp<<endl;
+                    
+                    files.push_back(temp);
                 }
             }
 
+            // Pass the collected files to git.addFiles
             git.addFiles(files);
         }
-
         else if (command == "add")
         {
             if (argc < 3)
@@ -148,14 +157,19 @@ int main(int argc, char *argv[])
             vector<string> files;
             for (int i = 2; i < argc; ++i)
             {
-                files.push_back(argv[i]);
+                string temp=argv[i];
+                if(temp[0]=='.' and temp[1]=='/')
+                {
+                   temp=temp.substr(2);
+                }
+                files.push_back(temp);
             }
 
             git.addFiles(files);
         }
         else if (command == "commit")
         {
-            string message ; // Default commit message
+            string message; // Default commit message
 
             // Check if -m flag is provided
             for (int i = 2; i < argc; ++i)
