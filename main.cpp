@@ -188,6 +188,17 @@ int main(int argc, char *argv[])
         {
             git.logCommits();
         }
+        else if (command=="checkout")
+        {
+            string sha= argv[2];
+
+            // cout<<"sha="<<sha<<endl;
+
+            git.checkout(sha);
+
+
+
+        }
         else
         {
             cerr << "Error: Unknown command '" << command << "'" << endl;

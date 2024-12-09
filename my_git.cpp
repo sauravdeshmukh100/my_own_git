@@ -331,7 +331,7 @@ public:
     }
 
     // Cat file command
-    void catFile(const string &sha, char flag)
+   void catFile(const string &sha, char flag)
     {
         try
         {
@@ -356,6 +356,9 @@ public:
         {
             cerr << "Error: " << e.what() << endl;
         }
+        
+
+
     }
 
     // Write tree command
@@ -852,4 +855,86 @@ public:
             headCommit = parentCommit;
         }
     }
+
+    void checkout(const string& commitSHA) {
+    string treeSHA = getTreeSHA(commitSHA);
+    // if (treeSHA.empty()) {
+    //     cerr << "Error: Invalid commit SHA." << endl;
+    //     return;
+    // }
+
+    vector<pair<string, string>> treeEntries = parseTree(treeSHA);
+    restoreFiles(treeEntries);
+
+    cout << "Checked out commit " << commitSHA << endl;
+}
+
+
+void restoreFiles(const vector<pair<string, string>>& treeEntries) {
+    for (const auto& entry : treeEntries) {
+        string typeAndSHA = entry.first;
+        string filename = entry.second;
+
+        if (typeAndSHA.find("blob") != string::npos) {
+            string fileSHA = typeAndSHA.substr(5);
+            string filePath = ".mygit/objects/" + fileSHA;
+
+            ifstream blobFile(filePath, ios::binary);
+            ofstream restoredFile(filename, ios::binary);
+
+            restoredFile << blobFile.rdbuf();
+        } else if (typeAndSHA.find("tree") != string::npos) {
+            string dirSHA = typeAndSHA.substr(5);
+            string dirName = filename;
+            mkdir(dirName.c_str(), 0755); // Create directory
+            restoreFiles(parseTree(dirSHA)); // Recursively restore subdirectories
+        }
+    }
+}
+
+
+vector<pair<string, string>> parseTree(const string& treeSHA) {
+    string treePath = ".mygit/objects/" + treeSHA;
+    ifstream treeFile(treePath);
+    vector<pair<string, string>> entries; // Pair of (type+SHA, filename)
+
+    string line;
+    while (getline(treeFile, line)) {
+        size_t pos = line.find(' ');
+        string typeAndSHA = line.substr(0, pos);
+        string filename = line.substr(pos + 1);
+        entries.push_back({typeAndSHA, filename});
+    }
+    return entries;
+}
+string getTreeSHA(const string& commitSHA) {
+    // Use readObject to fetch the type and content of the commit file
+    pair<string, string> objectData = readObject(commitSHA);
+    string type = objectData.first;
+    string content = objectData.second;
+
+    if (type != "commit") { // Ensure the object type is "commit"
+        cerr << "Error: Object is not of type 'commit' for SHA " << commitSHA << endl;
+        return "";
+    }
+
+    stringstream contentStream(content);
+    string line, treeSHA;
+
+    while (getline(contentStream, line)) {          // Read each line of the content
+        if (line.rfind("tree ", 0) == 0) {          // Check if the line starts with "tree "
+            treeSHA = line.substr(5);               // Extract everything after "tree "
+            break;
+        }
+    }
+
+    if (treeSHA.empty()) {
+        cerr << "Error: Tree SHA not found in commit object for SHA " << commitSHA << endl;
+    }
+
+    return treeSHA;                                 // Return the extracted tree SHA
+}
+
+
+
 };
