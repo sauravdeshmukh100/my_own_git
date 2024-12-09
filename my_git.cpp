@@ -11,6 +11,7 @@
 #include <set>
 #include <ctime>
 #include <map>
+#include <iomanip>
 using namespace std;
 namespace fs = filesystem;
 
@@ -176,7 +177,7 @@ private:
         file.close();
 
         string decompressed = decompressData(buffer.str());
-       
+
         size_t nullPos = decompressed.find('$');
         if (nullPos == string::npos)
         {
@@ -221,71 +222,69 @@ private:
         }
     }
 
-    
-
-
-
-  // Helper function to retrieve the tree from a given commit SHA
-map<string, string> getTreeFromCommit(const string& commitSha) {
-    // cout<<"in get tree from commit\n";
-    map<string, string> fileToSha;
-    // ifstream commitFile(GIT_DIR + "/objects/" + commitSha.substr(0,2)+ "/" + commitSha.substr(2));
-    string line;
-    bool inTree = false;
-
-    // cout<<"path is "<<GIT_DIR + "/objects/" + commitSha.substr(0,2)+ "/" + commitSha.substr(2)<<endl;
-
-    string content=readObject(commitSha).second;
-    // cout<<"content is "<<content<<endl;
-
-  istringstream iss(content);
-    while(iss)
+    // Helper function to retrieve the tree from a given commit SHA
+    map<string, string> getTreeFromCommit(const string &commitSha)
     {
-        // iss>>;
-        // iss>>content;
-          string mode, sha, filename,type;
-            iss >> mode >> type>>sha >> filename;
+        // cout<<"in get tree from commit\n";
+        map<string, string> fileToSha;
+        // ifstream commitFile(GIT_DIR + "/objects/" + commitSha.substr(0,2)+ "/" + commitSha.substr(2));
+        string line;
+        bool inTree = false;
+
+        // cout<<"path is "<<GIT_DIR + "/objects/" + commitSha.substr(0,2)+ "/" + commitSha.substr(2)<<endl;
+
+        string content = readObject(commitSha).second;
+        // cout<<"content is "<<content<<endl;
+
+        istringstream iss(content);
+        while (iss)
+        {
+            // iss>>;
+            // iss>>content;
+            string mode, sha, filename, type;
+            iss >> mode >> type >> sha >> filename;
 
             // cout<<"mode"<<mode<<" sha"<<sha<<" fname"<<filename<<endl;
             fileToSha[filename] = sha;
             // cout<<filename<<" "<<sha<<" "<<"done"<<endl;
+        }
+        // while (getline(commitFile, line)) {
+        //     if (line.find("tree") == 0) {
+        //         cout<<"find tree ";
+        //         inTree = true;
+        //         continue;
+        //     }
+        //     if (inTree && line.empty()) break;
+
+        //     if (inTree) {
+        //         istringstream iss(line);
+        //         string mode, sha, filename;
+        //         iss >> mode >> sha >> filename;
+        //         fileToSha[filename] = sha;
+
+        //         cout<<filename<<" "<<sha<<" ";
+        //     }
+        // }
+
+        // cout<<endl;
+        return fileToSha;
     }
-    // while (getline(commitFile, line)) {
-    //     if (line.find("tree") == 0) {
-    //         cout<<"find tree ";
-    //         inTree = true;
-    //         continue;
-    //     }
-    //     if (inTree && line.empty()) break;
 
-    //     if (inTree) {
-    //         istringstream iss(line);
-    //         string mode, sha, filename;
-    //         iss >> mode >> sha >> filename;
-    //         fileToSha[filename] = sha;
-
-    //         cout<<filename<<" "<<sha<<" ";
-    //     }
-    // }
-
-    // cout<<endl;
-    return fileToSha;
-}
-
-// Function to retrieve SHA-1 hashes from the index
-map<string, string> getIndexFileEntries() {
-    map<string, string> indexEntries;
-    ifstream indexFile(GIT_DIR + "/index");
-    string line;
-    while (getline(indexFile, line)) {
-        istringstream iss(line);
-        string mode, sha, filename;
-        iss >> mode >> sha >> filename;
-        indexEntries[filename] = sha;
+    // Function to retrieve SHA-1 hashes from the index
+    map<string, string> getIndexFileEntries()
+    {
+        map<string, string> indexEntries;
+        ifstream indexFile(GIT_DIR + "/index");
+        string line;
+        while (getline(indexFile, line))
+        {
+            istringstream iss(line);
+            string mode, sha, filename;
+            iss >> mode >> sha >> filename;
+            indexEntries[filename] = sha;
+        }
+        return indexEntries;
     }
-    return indexEntries;
-}
-
 
 public:
     // Initialize repository
@@ -341,7 +340,7 @@ public:
             switch (flag)
             {
             case 'p':
-                cout <<content<<"\n";
+                cout << content << "\n";
                 break;
             case 't':
                 cout << type << endl;
@@ -448,202 +447,211 @@ public:
         }
     }
 
-    
+    // Function to add files to the index
+    void addFiles(const vector<string> &files)
+    {
+        set<string> addedFiles;         // To track filenames already added to the index
+        map<string, string> fileHashes; // To track filename and their last stored hashes
 
-
-// Function to add files to the index
-void addFiles(const vector<string>& files) {
-    set<string> addedFiles; // To track filenames already added to the index
-    map<string, string> fileHashes; // To track filename and their last stored hashes
-
-    // Open index file in read mode to load existing contents
-    ifstream indexRead(GIT_DIR + "/index");
-    string line;
-    while (getline(indexRead, line)) {
-        istringstream iss(line);
-        string mode, sha, filename;
-        iss >> mode >> sha >> filename;
-        addedFiles.insert(filename);
-        fileHashes[filename] = sha; // Store the existing hash for comparison
-    }
-    indexRead.close();
-
-    ofstream indexFile(GIT_DIR + "/index", ios::app); // Append mode for new entries
-    for (const string& file : files) {
-        // Skip adding directories
-        if (fs::is_directory(file)) continue;
-
-        // Generate the new SHA-1 hash
-        string newSha = hashObject(file, true);
-
-        // Check if file is already indexed and if the hash has changed
-        if (addedFiles.find(file) != addedFiles.end() && fileHashes[file] == newSha) {
-            continue; // Skip if the file's hash is the same as before
+        // Open index file in read mode to load existing contents
+        ifstream indexRead(GIT_DIR + "/index");
+        string line;
+        while (getline(indexRead, line))
+        {
+            istringstream iss(line);
+            string mode, sha, filename;
+            iss >> mode >> sha >> filename;
+            addedFiles.insert(filename);
+            fileHashes[filename] = sha; // Store the existing hash for comparison
         }
+        indexRead.close();
 
-        // Write the file's details (mode, SHA, filename) to the index
-        string mode = "100644"; // Regular file mode
-        indexFile << mode << " " << newSha << " " << file << endl;
-        addedFiles.insert(file); // Add to the set to prevent duplicates
-        cout << "Added " << file << " to the index." << endl;
-    }
-    indexFile.close();
-}
+        ofstream indexFile(GIT_DIR + "/index", ios::app); // Append mode for new entries
+        for (const string &file : files)
+        {
+            // Skip adding directories
+            if (fs::is_directory(file))
+                continue;
 
-//end
+            // Generate the new SHA-1 hash
+            string newSha = hashObject(file, true);
 
-
-
-
-
-
-
-// adding updated commit
-
-
-
-// Updated commitChanges function to display the number of changed files
-void commitChanges(const string& message = "") {
-    try {
-        // 1. Validate staging area
-        string indexPath = GIT_DIR + "/index";
-        if (!fs::exists(indexPath)) {
-            throw runtime_error("Nothing to commit (create/copy files and use 'mygit add' to track)");
-        }
-
-        // 2. Retrieve parent commit's SHA from HEAD
-        string parentCommit = readHead();  // This might be empty for the first commit
-        // cout << "DEBUG: parentCommit: '" << parentCommit << "'" << endl;  // Debugging
-
-        map<string, string> parentTree;
-
-        // 3. Check if there is a parent commit
-        if (!parentCommit.empty()) {
-            // Get the path to the parent commit file
-            string parentCommitPath = GIT_DIR + "/objects/" + parentCommit.substr(0, 2) + "/" + parentCommit.substr(2);
-            // cout << "DEBUG: parentCommitPath: '" << parentCommitPath << "'" << endl;  // Debugging
-
-        //    commitFile=<<endl;
-            string treeSha=readObject(parentCommit).second.substr(5,40);
-
-            // cout<<"tree sha is"<<treeSha<<endl;
-
-            // ifstream commitFile(readObject(parentCommit).second);
-            // if (!commitFile.is_open()) {
-            //     throw runtime_error("Unable to open parent commit file.");
-            // }
-    // cout<<"commfile is"<<commitFile.string()<<endl;
-            
-            // cout<<"line "<<endl;
-            // while (getline(commitFile, line)) {
-            //      cout<<"labove ine is "<<line<<endl;
-            //     if (line.find("tree") == 0) {
-            //         istringstream iss(line);
-            //         string temp;
-            //         iss >> temp >> treeSha; // extract the tree SHA
-            //         // cout<<"line is "<<line<<endl;
-            //         // treeSha=line.substr(5,40);
-            //         break;
-            //     }
-            // }
-            // commitFile.close();
-
-            // cout << "DEBUG: treeSha: '" << treeSha << "'" << endl;  // Debugging
-
-            // Check if treeSha is empty before using substr()
-            if (treeSha.empty()) {
-                throw runtime_error("Tree SHA is empty, possible corruption in the commit object.");
+            // Check if file is already indexed and if the hash has changed
+            if (addedFiles.find(file) != addedFiles.end() && fileHashes[file] == newSha)
+            {
+                continue; // Skip if the file's hash is the same as before
             }
 
-            // Access the tree object using its SHA-1
-            string treePath = GIT_DIR + "/objects/" + treeSha.substr(0, 2) + "/" + treeSha.substr(2);
-            // cout << "DEBUG: treePath: '" << treePath << "'" << endl;  // Debugging
-            parentTree = getTreeFromCommit(treeSha);  // Retrieve the tree contents as a map
-        } else {
-            // No parent commit, this is the first commit
-            cout << "This is the first commit." << endl;
+            // Write the file's details (mode, SHA, filename) to the index
+            string mode = "100644"; // Regular file mode
+            indexFile << mode << " " << newSha << " " << file << endl;
+            addedFiles.insert(file); // Add to the set to prevent duplicates
+            cout << "Added " << file << " to the index." << endl;
         }
-
-        // 4. Retrieve current index entries
-        map<string, string> currentIndex = getIndexFileEntries();
-        int changedFilesCount = 0;
-        //  cout<<"currrnt ="<<
-        // 5. Compare index with the parent tree
-        for (const auto& [filename, sha] : currentIndex) {
-            // If the file is new (not in the parent tree) or modified (SHA differs)
-            if (parentTree.find(filename) == parentTree.end() || parentTree[filename] != sha) {
-                changedFilesCount++;
-            }
-        }
-
-        // 6. If no changes are detected, print a message and return
-        if (changedFilesCount == 0) {
-            cout << "0 changes to commit" << endl;
-            // return;
-        }
-
-        // 7. Create and write the commit object with metadata
-        string commitMsg = message.empty() ? "Default commit message" : message;
-        stringstream commitContent;
-        commitContent << "tree " << createTreeFromIndex() << "\n";
-        if (!parentCommit.empty()) commitContent << "parent " << parentCommit << "\n";
-        commitContent << "author " << getAuthorInfo() << " " << getTimestamp() << "\n";
-        commitContent << "committer " << getAuthorInfo() << " " << getTimestamp() << "\n\n";
-        commitContent << commitMsg << "\n";
-        string commitSha = writeObject(commitContent.str(), "commit");
-
-        // 8. Update HEAD and clear index
-        updateHead(commitSha);
-        ofstream indexFile(indexPath, ios::trunc); // Clear index after commit
         indexFile.close();
-
-        // 9. Output success message with changed files count
-        cout << "[main " << commitSha.substr(0, 7) << "] " << commitMsg << "\n";
-        cout << "Files changed: " << changedFilesCount << endl;
-
-    } catch (const exception& e) {
-        cerr << "Error: " << e.what() << endl;
     }
-}
 
+    // end
 
+    // adding updated commit
 
+    // Updated commitChanges function to display the number of changed files
+    void commitChanges(const string &message = "")
+    {
+        try
+        {
+            // 1. Validate staging area
+            string indexPath = GIT_DIR + "/index";
+            if (!fs::exists(indexPath))
+            {
+                throw runtime_error("Nothing to commit (create/copy files and use 'mygit add' to track)");
+            }
 
- 
+            // 2. Retrieve parent commit's SHA from HEAD
+            string parentCommit = readHead(); // This might be empty for the first commit
+            // cout << "DEBUG: parentCommit: '" << parentCommit << "'" << endl;  // Debugging
+
+            map<string, string> parentTree;
+
+            // 3. Check if there is a parent commit
+            if (!parentCommit.empty())
+            {
+                // Get the path to the parent commit file
+                string parentCommitPath = GIT_DIR + "/objects/" + parentCommit.substr(0, 2) + "/" + parentCommit.substr(2);
+                // cout << "DEBUG: parentCommitPath: '" << parentCommitPath << "'" << endl;  // Debugging
+
+                //    commitFile=<<endl;
+                string treeSha = readObject(parentCommit).second.substr(5, 40);
+
+                // cout<<"tree sha is"<<treeSha<<endl;
+
+                // ifstream commitFile(readObject(parentCommit).second);
+                // if (!commitFile.is_open()) {
+                //     throw runtime_error("Unable to open parent commit file.");
+                // }
+                // cout<<"commfile is"<<commitFile.string()<<endl;
+
+                // cout<<"line "<<endl;
+                // while (getline(commitFile, line)) {
+                //      cout<<"labove ine is "<<line<<endl;
+                //     if (line.find("tree") == 0) {
+                //         istringstream iss(line);
+                //         string temp;
+                //         iss >> temp >> treeSha; // extract the tree SHA
+                //         // cout<<"line is "<<line<<endl;
+                //         // treeSha=line.substr(5,40);
+                //         break;
+                //     }
+                // }
+                // commitFile.close();
+
+                // cout << "DEBUG: treeSha: '" << treeSha << "'" << endl;  // Debugging
+
+                // Check if treeSha is empty before using substr()
+                if (treeSha.empty())
+                {
+                    throw runtime_error("Tree SHA is empty, possible corruption in the commit object.");
+                }
+
+                // Access the tree object using its SHA-1
+                string treePath = GIT_DIR + "/objects/" + treeSha.substr(0, 2) + "/" + treeSha.substr(2);
+                // cout << "DEBUG: treePath: '" << treePath << "'" << endl;  // Debugging
+                parentTree = getTreeFromCommit(treeSha); // Retrieve the tree contents as a map
+            }
+            else
+            {
+                // No parent commit, this is the first commit
+                cout << "This is the first commit." << endl;
+            }
+
+            // 4. Retrieve current index entries
+            map<string, string> currentIndex = getIndexFileEntries();
+            int changedFilesCount = 0;
+            //  cout<<"currrnt ="<<
+            // 5. Compare index with the parent tree
+            for (const auto &[filename, sha] : currentIndex)
+            {
+                // If the file is new (not in the parent tree) or modified (SHA differs)
+                if (parentTree.find(filename) == parentTree.end() || parentTree[filename] != sha)
+                {
+                    changedFilesCount++;
+                }
+            }
+
+            // 6. If no changes are detected, print a message and return
+            if (changedFilesCount == 0)
+            {
+                cout << "0 changes to commit" << endl;
+                // return;
+            }
+
+            // 7. Create and write the commit object with metadata
+            string commitMsg = message.empty() ? "Default commit message" : message;
+            stringstream commitContent;
+            commitContent << "tree " << createTreeFromIndex() << "\n";
+            if (!parentCommit.empty())
+                commitContent << "parent " << parentCommit << "\n";
+            commitContent << "author " << getAuthorInfo() << " " << getTimestamp() << "\n";
+            commitContent << "committer " << getAuthorInfo() << " " << getTimestamp() << "\n\n";
+            commitContent << commitMsg << "\n";
+            string commitSha = writeObject(commitContent.str(), "commit");
+
+            // 8. Update HEAD and clear index
+            updateHead(commitSha);
+            ofstream indexFile(indexPath, ios::trunc); // Clear index after commit
+            indexFile.close();
+
+            // 9. Output success message with changed files count
+            cout << "[main " << commitSha.substr(0, 7) << "] " << commitMsg << "\n";
+            cout << "Files changed: " << changedFilesCount << endl;
+        }
+        catch (const exception &e)
+        {
+            cerr << "Error: " << e.what() << endl;
+        }
+    }
+
     // Helper function to create a tree object from index
-    string createTreeFromIndex() {
+    string createTreeFromIndex()
+    {
         vector<string> stagedFiles;
         string indexPath = GIT_DIR + "/index";
         ifstream indexFile(indexPath);
 
-        if (!indexFile.is_open()) {
+        if (!indexFile.is_open())
+        {
             throw runtime_error("Index file not found");
         }
 
         string line;
-        while (getline(indexFile, line)) {
-            if (!line.empty()) {
+        while (getline(indexFile, line))
+        {
+            if (!line.empty())
+            {
                 stagedFiles.push_back(line);
             }
         }
         indexFile.close();
 
-        if (stagedFiles.empty()) {
+        if (stagedFiles.empty())
+        {
             throw runtime_error("No files in staging area");
         }
 
         // Write tree from staged files directly
         return writeTreeFromStagedFiles(stagedFiles);
     }
-//  static int countin=0;
+    //  static int countin=0;
     // Helper function to create tree object from staged files
-    string writeTreeFromStagedFiles(const vector<string>& stagedFiles) {
+    string writeTreeFromStagedFiles(const vector<string> &stagedFiles)
+    {
         stringstream treeContent;
 
         // Sort files to ensure consistent tree hashes
         map<string, pair<string, string>> sortedEntries; // filename -> (mode, sha)
-      int  count=0;
-        for (const string &line : stagedFiles) {
+        int count = 0;
+        for (const string &line : stagedFiles)
+        {
             istringstream iss(line);
             string mode, sha, filename;
             iss >> mode >> sha >> filename;
@@ -651,10 +659,11 @@ void commitChanges(const string& message = "") {
             count++;
         }
 
-        cout<<count<<" files wass there in staging area"<<endl;
+        cout << count << " files wass there in staging area" << endl;
 
         // Build tree content from sorted entries
-        for (const auto& entry : sortedEntries) {
+        for (const auto &entry : sortedEntries)
+        {
             treeContent << entry.second.first << " blob " << entry.second.second
                         << " " << entry.first << "\n";
         }
@@ -664,12 +673,14 @@ void commitChanges(const string& message = "") {
     }
 
     // Helper function to read HEAD commit
-    string readHead() {
+    string readHead()
+    {
         string headPath = GIT_DIR + "/HEAD";
         ifstream headFile(headPath);
         string head;
 
-        if (headFile.is_open()) {
+        if (headFile.is_open())
+        {
             getline(headFile, head);
             headFile.close();
             return head;
@@ -678,42 +689,50 @@ void commitChanges(const string& message = "") {
     }
 
     // Helper function to update HEAD
-    void updateHead(const string& commitSha) {
+    void updateHead(const string &commitSha)
+    {
         string headPath = GIT_DIR + "/HEAD";
         ofstream headFile(headPath);
-        if (headFile.is_open()) {
+        if (headFile.is_open())
+        {
             headFile << commitSha;
             headFile.close();
-        } else {
+        }
+        else
+        {
             throw runtime_error("Could not update HEAD");
         }
     }
 
     // Helper function to get current timestamp as string
-    string getTimestamp() {
+
+    string getTimestamp()
+    {
         time_t now = time(nullptr);
         return to_string(now);
     }
 
     // Helper function to get commit author info
-    string getAuthorInfo() {
+    string getAuthorInfo()
+    {
         return "Saurav <sauravdeshmukh200@gmail.com>";
     }
 
     // Helper function to count staged files
-    int countStagedFiles() {
+    int countStagedFiles()
+    {
         int count = 0;
         ifstream indexFile(GIT_DIR + "/index");
         string line;
-        while (getline(indexFile, line)) {
-            if (!line.empty()) {
+        while (getline(indexFile, line))
+        {
+            if (!line.empty())
+            {
                 count++;
             }
         }
         return count;
     }
-
-
 
     void logCommits()
     {
@@ -765,33 +784,43 @@ void commitChanges(const string& message = "") {
                     // Extract the parent commit SHA
                     parentCommit = line.substr(7);
                 }
-                else if (line.find("author") == 0)
-                {
-                    // Extract the author information
-                    author = line.substr(7); // Skip "author " (7 characters)
+                // else if (line.find("author") == 0)
+                // {
+                //     // Extract the author information
+                //     author = line.substr(7); // Skip "author " (7 characters)
 
-                    // Find the position of the last space, which is before the timestamp
-                    size_t lastSpacePos = author.find_last_of(' ');
-                    if (lastSpacePos != string::npos)
-                    {
-                        string timestampStr = author.substr(lastSpacePos + 1); // Get the timestamp part
-                        author = author.substr(0, lastSpacePos);               // Get the author email part
+                //     // Find the position of the last space, which is before the timestamp
+                //     size_t lastSpacePos = author.find_last_of(' ');
+                //     if (lastSpacePos != string::npos)
+                //     {
+                //         string timestampStr = author.substr(lastSpacePos + 1); // Get the timestamp part
+                //         author = author.substr(0, lastSpacePos);               // Get the author email part
 
-                        // Convert timestamp to integer
-                        try
-                        {
-                            timestamp = stol(timestampStr);
-                        }
-                        catch (const invalid_argument &e)
-                        {
-                            cerr << "Error: Invalid timestamp format in commit object." << endl;
-                        }
-                    }
-                }
-                else if (line.find("committer") == 0)
+                //         // Convert timestamp to integer
+                //         try
+                //         {
+                //             timestamp = stol(timestampStr);
+                //         }
+                //         catch (const invalid_argument &e)
+                //         {
+                //             cerr << "Error: Invalid timestamp format in commit object." << endl;
+                //         }
+                //     }
+                // }
+                else if (line.find("committ") == 0)
                 {
                     // Extract the committer information
                     committer = line.substr(10);
+                    string temp;
+                    int n=committer.size();
+                    for(int i=n-1;i>=0 and committer[i]!=' ';i--)
+                    {
+                        temp.push_back(committer[i]);
+                    }
+
+                    reverse(temp.begin(),temp.end());
+
+                    timestamp=stoi(temp);
                 }
             }
 
@@ -801,24 +830,23 @@ void commitChanges(const string& message = "") {
             {
                 cout << "parent " << parentCommit << endl;
             }
-            cout << "Author: " << author << endl;
+            // cout << "Author: " << author << endl;
+            cout<<"commit message :"<< message << endl;
 
             // Format and print the timestamp
             if (timestamp != 0)
             {
-                struct tm *dt = localtime(&timestamp);
-                char buffer[30];
-                strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", dt);
-                cout << "Date: " << buffer << endl;
+                tm *gmt = gmtime(&timestamp); // Get UTC time
+                stringstream ss;
+                ss << put_time(gmt, "%Y-%m-%d %H:%M:%S UTC");
+                cout<<"date and time :"<<ss.str()<<endl;
             }
             else
             {
-                cout << "Date: (invalid timestamp)" << endl;
+                cout << " (invalid timestamp)" << endl;
             }
 
-            cout << endl
-                 << message << endl
-                 << endl;
+            cout<<"commiter info: "<<committer<<endl<<endl;
 
             // Move to the parent commit
             headCommit = parentCommit;
