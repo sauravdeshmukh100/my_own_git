@@ -98,8 +98,6 @@ Ensure you have the following installed on your system:
 
 ---
 
----
-
 ## **Execution Example**
 ```bash
 ./mygit init
