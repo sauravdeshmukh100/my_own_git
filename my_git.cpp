@@ -863,50 +863,106 @@ public:
     //     return;
     // }
 
-    vector<pair<string, string>> treeEntries = parseTree(treeSHA);
+    vector<tuple<string, string, string, string>> treeEntries = parseTree(treeSHA);
     restoreFiles(treeEntries);
 
     cout << "Checked out commit " << commitSHA << endl;
 }
 
 
-void restoreFiles(const vector<pair<string, string>>& treeEntries) {
+// void restoreFiles(const vector<pair<string, string>>& treeEntries) {
+//     for (const auto& entry : treeEntries) {
+//         string typeAndSHA = entry.first;
+//         string filename = entry.second;
+
+//         if (typeAndSHA.find("blob") != string::npos) {
+//             string fileSHA = typeAndSHA.substr(5);
+//             string filePath = ".mygit/objects/" + fileSHA;
+
+//             ifstream blobFile(filePath, ios::binary);
+//             ofstream restoredFile(filename, ios::binary);
+
+//             restoredFile << blobFile.rdbuf();
+//         } else if (typeAndSHA.find("tree") != string::npos) {
+//             string dirSHA = typeAndSHA.substr(5);
+//             string dirName = filename;
+//             mkdir(dirName.c_str(), 0755); // Create directory
+//             restoreFiles(parseTree(dirSHA)); // Recursively restore subdirectories
+//         }
+//     }
+// }
+
+
+void restoreFiles(const vector<tuple<string, string, string, string>>& treeEntries) {
     for (const auto& entry : treeEntries) {
-        string typeAndSHA = entry.first;
-        string filename = entry.second;
+        string mode, objectType, sha, name;
+        tie(mode, objectType, sha, name) = entry;
 
-        if (typeAndSHA.find("blob") != string::npos) {
-            string fileSHA = typeAndSHA.substr(5);
-            string filePath = ".mygit/objects/" + fileSHA;
+        if (objectType == "blob") { // File
+            pair<string, string> blobData = readObject(sha);
 
-            ifstream blobFile(filePath, ios::binary);
-            ofstream restoredFile(filename, ios::binary);
+            if (blobData.first != "blob") {
+                cerr << "Error: Object is not of type 'blob' for SHA " << sha << endl;
+                continue;
+            }
 
-            restoredFile << blobFile.rdbuf();
-        } else if (typeAndSHA.find("tree") != string::npos) {
-            string dirSHA = typeAndSHA.substr(5);
-            string dirName = filename;
-            mkdir(dirName.c_str(), 0755); // Create directory
-            restoreFiles(parseTree(dirSHA)); // Recursively restore subdirectories
+            // // Skip the header in the blob
+            // size_t headerEnd = blobData.second.find('$');
+            // if (headerEnd == string::npos) {
+            //     cerr << "Error: Invalid blob object format for SHA " << sha << endl;
+            //     continue;
+            // }
+            string blobContent = blobData.second;
+            // Ensure parent directories exist
+            createDirectories(name);
+
+            // Write blob content to file
+            ofstream restoredFile(name, ios::binary);
+            restoredFile << blobContent;
+            restoredFile.close();
+
+        } else if (objectType == "tree") { // Directory
+            mkdir(name.c_str(), 0755); // Create directory
+            restoreFiles(parseTree(sha)); // Recursively restore subdirectories
         }
     }
 }
 
 
-vector<pair<string, string>> parseTree(const string& treeSHA) {
-    string treePath = ".mygit/objects/" + treeSHA;
-    ifstream treeFile(treePath);
-    vector<pair<string, string>> entries; // Pair of (type+SHA, filename)
 
-    string line;
-    while (getline(treeFile, line)) {
-        size_t pos = line.find(' ');
-        string typeAndSHA = line.substr(0, pos);
-        string filename = line.substr(pos + 1);
-        entries.push_back({typeAndSHA, filename});
+vector<tuple<string, string, string, string>> parseTree(const string& treeSHA) {
+    // Use readObject to fetch the type and content of the tree object
+    pair<string, string> objectData = readObject(treeSHA);
+    string type = objectData.first;
+    string content = objectData.second;
+
+    if (type != "tree") { // Ensure the object type is "tree"
+        cerr << "Error: Object is not of type 'tree' for SHA " << treeSHA << endl;
+        return {};
     }
+
+    
+    string treeContent = content;
+
+    vector<tuple<string, string, string, string>> entries; // Store (mode, objectType, sha, name)
+
+    stringstream contentStream(treeContent);
+    string line;
+    while (getline(contentStream, line)) {
+        stringstream lineStream(line);
+        string mode, objectType, sha, name;
+
+        if (!(lineStream >> mode >> objectType >> sha >> name)) {
+            cerr << "Error: Malformed tree entry in SHA " << treeSHA << endl;
+            continue;
+        }
+
+        entries.emplace_back(mode, objectType, sha, name);
+    }
+
     return entries;
 }
+
 string getTreeSHA(const string& commitSHA) {
     // Use readObject to fetch the type and content of the commit file
     pair<string, string> objectData = readObject(commitSHA);
@@ -931,10 +987,27 @@ string getTreeSHA(const string& commitSHA) {
     if (treeSHA.empty()) {
         cerr << "Error: Tree SHA not found in commit object for SHA " << commitSHA << endl;
     }
+  
 
+    cout<<"tree sha is"<< treeSHA<<endl;
     return treeSHA;                                 // Return the extracted tree SHA
 }
 
+
+void createDirectories(const string& filePath) {
+    size_t lastSlash = filePath.find_last_of('/');
+    if (lastSlash == string::npos) return; // No directories in the path
+
+    string dirPath = filePath.substr(0, lastSlash); // Extract directory path
+    stringstream ss(dirPath);
+    string segment;
+    string currentPath = ".";
+
+    while (getline(ss, segment, '/')) { // Create each segment of the path
+        currentPath += "/" + segment;
+        mkdir(currentPath.c_str(), 0755); // Create directory if it doesn't exist
+    }
+}
 
 
 };
